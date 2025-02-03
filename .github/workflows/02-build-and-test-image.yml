@@ -68,6 +68,13 @@ jobs:
           export TESTING_IMAGE="${{ github.run_id }}"
           docker compose -f docker-compose.test.yml up --exit-code-from sut
 
+      - name: Dump logs on failure
+        if: failure()
+        run: |
+          docker logs $(docker ps -q -f name=allhands22)
+          docker logs $(docker ps -q -f name=postgres)
+          docker logs $(docker ps -q -f name=sut)
+
       # run scans of the image at Docker engine without actions
       - name: Run Trivy for all CVEs (non-blocking)
         uses: aquasecurity/trivy-action@master
