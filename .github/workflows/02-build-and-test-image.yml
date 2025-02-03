@@ -28,7 +28,7 @@ jobs:
       - name: Checkout git repo
         uses: actions/checkout@v4
 
-      # Without QEMU, Docker can only build images for the host's architecture.
+      # Without QEMU, Docker can only build images for the host's architecture
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
 
@@ -55,7 +55,7 @@ jobs:
           platforms: linux/amd64
 
       - name: List docker images
-        run: docker images ls
+        run: docker image ls
 
         # for simple tests (npm test, etc.) just run a local image in docker
       - name: Unit Testing in Docker

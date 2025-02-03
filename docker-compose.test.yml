@@ -11,7 +11,9 @@ services:
       - ./healthchecks:/healthchecks
     healthcheck:
       test: /healthchecks/postgres-healthcheck
-      interval: "5s"
+      interval: "10s"
+      timeout: "5s"
+      retries: 6
   sut:
     image: "${TESTING_IMAGE}"
     depends_on:
