@@ -1,4 +1,4 @@
-name: Part 2 - build and test image
+name: Part 2 - build and test image # it gonna be a workflow name in GitHub portal
 description: This workflow builds and pushes a Docker image using BuildKit cache.
 
 on:
