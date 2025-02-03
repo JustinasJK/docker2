@@ -21,6 +21,9 @@ jobs:
       - name: Debug GitHub event name
         run: echo Triggered by:${{ github.event_name }}
 
+      - name: Debug GitHub run id
+        run: echo Workflow run ID is:${{ github.run_id }}
+
         # we use GitHub repo for scanning
       - name: Checkout git repo
         uses: actions/checkout@v4
@@ -46,12 +49,26 @@ jobs:
           push: false
           load: true # Export to Docker Engine rather than pushing to a registry
           tags: ${{ github.run_id }}
-          target: test # value used from Dockerfile build, as there are base, test anf final images
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          target: test # build only "test" stage, value takne from Dockerfile
+          cache-from: type=gha # Uses GitHub Actions cache to speed up future builds
+          cache-to: type=gha,mode=max #Stores cache layers to avoid rebuilding unchanged parts
           platforms: linux/amd64
 
-      # run tests of the image at Docker engine without actions
+      - name: List docker images
+        run: docker images ls
+
+        # for simple tests (npm test, etc.) just run a local image in docker
+      - name: Unit Testing in Docker
+        run: |
+          docker run --rm ${{ github.run_id }} echo "run test commands here"
+
+        # integration tests
+      - name: Test healthcheck in Docker Compose
+        run: |
+          export TESTING_IMAGE="${{ github.run_id }}"
+          docker compose -f docker-compose.test.yml up --exit-code-from sut
+
+      # run scans of the image at Docker engine without actions
       - name: Run Trivy for all CVEs (non-blocking)
         uses: aquasecurity/trivy-action@master
         with:
@@ -59,7 +76,7 @@ jobs:
           exit-code: 0
           format: table 
 
-      # run tests of the image at Docker engine and block if critical vulner. exists
+      # run scans of the image at Docker engine and block if critical vulner. exists
       - name: Run Trivy for HIGH,CRITICAL CVEs and report (blocking)
         uses: aquasecurity/trivy-action@master
         with:
@@ -87,12 +104,12 @@ jobs:
           tags: |
             type=raw,value=07
 
-      # - name: Docker Build and Push to Docker Hub
-      #   uses: docker/build-push-action@v6
-      #   with:
-      #     push: true
-      #     tags: ${{ steps.docker_meta_jk.outputs.tags}}
-      #     labels: ${{ steps.docker_meta_jk.outputs.labels}}
-      #     cache-from: type=gha
-      #     cache-to: type=gha,mode=max
-      #     pla tforms: linux/amd64,linux/arm64
+      - name: Docker Build and Push to Docker Hub
+        uses: docker/build-push-action@v6
+        with:
+          push: true
+          tags: ${{ steps.docker_meta_jk.outputs.tags}}
+          labels: ${{ steps.docker_meta_jk.outputs.labels}}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          pla tforms: linux/amd64,linux/arm64
