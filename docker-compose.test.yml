@@ -1,6 +1,6 @@
 services:
   allhands22:
-    image: "1234"
+    image: "${TESTING_IMAGE}"
   
   postgres:
     image: postgres
@@ -13,7 +13,7 @@ services:
       test: /healthchecks/postgres-healthcheck
       interval: "10s"
   sut:
-    image: "1234"
+    image: "${TESTING_IMAGE}"
     depends_on:
       allhands22:
         condition: service_started
