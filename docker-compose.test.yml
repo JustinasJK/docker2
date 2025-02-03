@@ -1,11 +1,6 @@
 services:
   allhands22:
-    image: "${TESTING_IMAGE}"
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
+    image: "1234"
   
   postgres:
     image: postgres
@@ -17,27 +12,12 @@ services:
     healthcheck:
       test: /healthchecks/postgres-healthcheck
       interval: "10s"
-      timeout: "5s"
-      retries: 6
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-  
   sut:
-    image: "${TESTING_IMAGE}"
+    image: "1234"
     depends_on:
       allhands22:
         condition: service_started
-      postgres:
-        condition: service_healthy
+      # postgres:
+      #   condition: service_healthy
     # run all your tests here against the allhands22 service
-    command: >
-      sh -c "echo 'Running tests...';
-             curl -v --fail http://allhands22:80 || (echo 'Curl failed'; exit 1)"
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
+    command: curl --fail http://allhands22:80 || exit 1
