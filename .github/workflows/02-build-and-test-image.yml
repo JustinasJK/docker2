@@ -57,7 +57,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           push: true
-          tags: ghcr.io/docker2/my-image:${{ github.run_id }}
+          tags: ghcr.io/JustinasJK/docker2:${{ github.run_id }} # github repository path
           target: test
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -78,7 +78,7 @@ jobs:
             --docker-server=https://ghcr.io \
             --docker-username=${{ github.actor }} \
             --docker-password=${{ secrets.GITHUB_TOKEN }}
-          export TESTING_IMAGE=ghcr.io/docker2/my-image:"$GITHUB_RUN_ID"
+          export TESTING_IMAGE=ghcr.io/JustinasJK/docker2:"$GITHUB_RUN_ID"
           envsubst < manifests/deployment.yaml  | kubectl apply -f -
           kubectl rollout status deployment myapp
           kubectl exec deploy/myapp -- curl --fail localhost
@@ -140,7 +140,7 @@ jobs:
         id: docker_meta_jk
         uses: docker/metadata-action@v5
         with:
-          images: justinask01/docker2 # List of Docker images to use as base name for tags
+          images: justinask01/docker2 # List of Docker images to use as base name for tags. Value taken from Docker repository
           flavor: |
             latest=false
           tags: |
