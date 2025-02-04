@@ -43,6 +43,48 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
+      - name: Login to ghcr.io registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }} # This is an automatic GitHub Actions context variable.
+          # It contains the GitHub username of the person (or bot) that triggered the workflow.
+          # If you pushed a commit, github.actor will be your GitHub username.
+          password: ${{ secrets.GITHUB_TOKEN }} # A temporary authentication token provided by GitHub for the duration of the workflow run.
+
+      # build and push a temporary image to GHCR
+      - name: Build and Push to GHCR
+        uses: docker/build-push-action@v6
+        with:
+          push: true
+          tags: ghcr.io/docker2/my-image:${{ github.run_id }}
+          target: test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64
+
+      - uses: AbsaOSS/k3d-action@v2
+        with:
+          cluster-name: "test-cluster-1"
+          args: >-
+            --agents 1
+            --no-lb
+            --k3s-arg "--no-deploy=traefik,servicelb,metrics-server@server:*"
+
+     # testing temporary image in k3d Kubernetes at github registry   
+      - name: Smoke test deployment in k3d Kubernetes
+        run: |
+          kubectl create secret docker-registry regcred \
+            --docker-server=https://ghcr.io \
+            --docker-username=${{ github.actor }} \
+            --docker-password=${{ secrets.GITHUB_TOKEN }}
+          export TESTING_IMAGE=ghcr.io/docker2/my-image:"$GITHUB_RUN_ID"
+          envsubst < manifests/deployment.yaml  | kubectl apply -f -
+          kubectl rollout status deployment myapp
+          kubectl exec deploy/myapp -- curl --fail localhost
+
+    # testing of K8s has finished
+
       - name: Build and export to Docker
         uses: docker/build-push-action@v6
         with:
