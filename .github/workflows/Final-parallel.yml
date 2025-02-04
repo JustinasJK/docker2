@@ -1,40 +1,29 @@
-name: Part 2 - build and test image # it gonna be a workflow name in GitHub portal
-description: This workflow builds and pushes a Docker image using BuildKit cache.
+name: Final - paralell jobs # it gonna be a workflow name in GitHub portal
+description: Combination of Part 1 and 2, jobs run in parallel
 
 on:
-  # push:
-  #   branches:
-  #   - main
+  push:
+    branches:
+    - main
   pull_request:
 
 jobs:
-  build-docker-image:
-    name: Build Docker Image
+# FIRST JOB #######################################################################   
+  build-test-image:
+    name: Build Docker Image for testing
     runs-on: ubuntu-latest
 
     permissions:
-      contents: read # for actions/checkout to fetch code in GitHub repo
-      security-events: write # for github/codeql-action/upload-sarif to upload SARIF results
-      packages: write # needed to push docker image to ghcr.io, used for GITHUB_TOKEN
+      packages: write # needed to push docker image to ghcr.io, used for GITHUB_TOKEN variable
     
     steps:
-
+      # debug info
       - name: Debug GitHub event name
         run: echo Triggered by:${{ github.event_name }}
 
       - name: Debug GitHub run id
         run: echo Workflow run ID is:${{ github.run_id }}
 
-        # we use GitHub repo for scanning
-      - name: Checkout git repo
-        uses: actions/checkout@v4
-
-      # Without QEMU, Docker can only build images for the host's architecture
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-
-      # Allows you to build images for different architectures, like linux/amd64, linux/arm64, etc.
-      # Also allows you to use BuildKit cache.
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -48,12 +37,10 @@ jobs:
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
-          username: ${{ github.actor }} # This is an automatic GitHub Actions context variable.
-          # It contains the GitHub username of the person (or bot) that triggered the workflow.
-          # If you pushed a commit, github.actor will be your GitHub username.
-          password: ${{ secrets.GITHUB_TOKEN }} # A temporary authentication token provided by GitHub for the duration of the workflow run.
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-      # build and push a temporary image to GHCR
+      # build and push a temporary image to GHCR. After this we have an image in Docker engine (not registry)
       - name: Build and Push to GHCR
         uses: docker/build-push-action@v6
         with:
@@ -63,6 +50,120 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           platforms: linux/amd64
+
+# NEXT JOB #######################################################################   
+  test-unit:
+    name: Unit tests in Docker
+    needs: [build-test-image]
+    runs-on: ubuntu-latest
+
+    # permissions:
+    #   packages: read
+
+    steps:
+
+      - name: Login to ghcr.io registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Debug, check what images we have
+      - name: List docker images
+        run: docker image ls
+
+      - name: Unit Testing in Docker engine
+        run: |
+          docker run --rm ghcr.io/justinasjk/docker2:${{ github.run_id }} echo "run test commands here"
+
+# NEXT JOB #######################################################################
+  test-integration:
+    name: Integration tests in Docker Composer
+    needs: [build-test-image]
+    runs-on: ubuntu-latest
+
+    # permissions:
+    #   packages: read
+
+    steps:
+
+    - name: Checkout git repo
+      uses: actions/checkout@v2
+
+    # - name: Login to Docker Hub
+    #   uses: docker/login-action@v3
+    #   with:
+    #     username: ${{ secrets.DOCKERHUB_USERNAME }}
+    #     password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+    - name: Login to ghcr.io registry
+      uses: docker/login-action@v3
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Test healthcheck in Docker Compose
+      run: |
+        export TESTING_IMAGE=ghcr.io/justinasjk/docker2:"$GITHUB_RUN_ID"
+        echo Testing image: "$TESTING_IMAGE"
+        docker compose -f docker-compose.test.yml up --exit-code-from sut
+
+# NEXT JOB #######################################################################
+  test-k3d:
+    name: Test Deployment in Kubernetes
+    needs: [build-test-image]
+    runs-on: ubuntu-latest
+
+    # permissions:
+    #   packages: read
+
+    steps:
+
+    - name: Checkout git repo
+      uses: actions/checkout@v2
+
+    # - name: Login to Docker Hub
+    #   uses: docker/login-action@v3
+    #   with:
+    #     username: ${{ secrets.DOCKERHUB_USERNAME }}
+    #     password: ${{ secrets.DOCKERHUB_TOKEN }}
+    
+    - name: Login to ghcr.io registry
+      uses: docker/login-action@v3
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - uses: AbsaOSS/k3d-action@v2
+      with:
+        cluster-name: "test-cluster-1"
+        args: >-
+          --agents 1
+          --no-lb
+          --k3s-arg "--no-deploy=traefik,servicelb,metrics-server@server:*"
+
+    - name: Smoke test deployment in k3d Kubernetes
+      run: |
+        kubectl create secret docker-registry regcred \
+          --docker-server=https://ghcr.io \
+          --docker-username=${{ github.actor }} \
+          --docker-password=${{ secrets.GITHUB_TOKEN }}
+        export TESTING_IMAGE=ghcr.io/justinasjk/docker2:"$GITHUB_RUN_ID"
+        envsubst < manifests/deployment.yaml  | kubectl apply -f -
+        kubectl rollout status deployment myapp
+        kubectl exec deploy/myapp -- curl --fail localhost
+
+
+
+
+
+
+
+
+
 
       - uses: AbsaOSS/k3d-action@v2
         with:
