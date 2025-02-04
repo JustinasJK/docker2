@@ -165,95 +165,95 @@ jobs:
 
 
 
-      - uses: AbsaOSS/k3d-action@v2
-        with:
-          cluster-name: "test-cluster-1"
-          args: >-
-            --agents 1
-            --no-lb
-            --k3s-arg "--no-deploy=traefik,servicelb,metrics-server@server:*"
+    #   - uses: AbsaOSS/k3d-action@v2
+    #     with:
+    #       cluster-name: "test-cluster-1"
+    #       args: >-
+    #         --agents 1
+    #         --no-lb
+    #         --k3s-arg "--no-deploy=traefik,servicelb,metrics-server@server:*"
 
-     # testing temporary image in k3d Kubernetes at github registry   
-      - name: Smoke test deployment in k3d Kubernetes
-        run: |
-          kubectl create secret docker-registry regcred \
-            --docker-server=https://ghcr.io \
-            --docker-username=${{ github.actor }} \
-            --docker-password=${{ secrets.GITHUB_TOKEN }}
-          export TESTING_IMAGE=ghcr.io/justinasjk/docker2:"$GITHUB_RUN_ID"
-          envsubst < manifests/deployment.yaml  | kubectl apply -f -
-          kubectl rollout status deployment myapp
-          kubectl exec deploy/myapp -- curl --fail localhost
+    #  # testing temporary image in k3d Kubernetes at github registry   
+    #   - name: Smoke test deployment in k3d Kubernetes
+    #     run: |
+    #       kubectl create secret docker-registry regcred \
+    #         --docker-server=https://ghcr.io \
+    #         --docker-username=${{ github.actor }} \
+    #         --docker-password=${{ secrets.GITHUB_TOKEN }}
+    #       export TESTING_IMAGE=ghcr.io/justinasjk/docker2:"$GITHUB_RUN_ID"
+    #       envsubst < manifests/deployment.yaml  | kubectl apply -f -
+    #       kubectl rollout status deployment myapp
+    #       kubectl exec deploy/myapp -- curl --fail localhost
 
-    # testing of K8s has finished
+    # # testing of K8s has finished
 
-      - name: Build and export to Docker
-        uses: docker/build-push-action@v6
-        with:
-          push: false
-          load: true # Export to Docker Engine rather than pushing to a registry
-          tags: ${{ github.run_id }}
-          target: test # build only "test" stage, value takne from Dockerfile
-          cache-from: type=gha # Uses GitHub Actions cache to speed up future builds
-          cache-to: type=gha,mode=max #Stores cache layers to avoid rebuilding unchanged parts
-          platforms: linux/amd64
+    #   - name: Build and export to Docker
+    #     uses: docker/build-push-action@v6
+    #     with:
+    #       push: false
+    #       load: true # Export to Docker Engine rather than pushing to a registry
+    #       tags: ${{ github.run_id }}
+    #       target: test # build only "test" stage, value takne from Dockerfile
+    #       cache-from: type=gha # Uses GitHub Actions cache to speed up future builds
+    #       cache-to: type=gha,mode=max #Stores cache layers to avoid rebuilding unchanged parts
+    #       platforms: linux/amd64
 
-      - name: List docker images
-        run: docker image ls
+    #   - name: List docker images
+    #     run: docker image ls
 
-        # for simple tests (npm test, etc.) just run a local image in docker
-      - name: Unit Testing in Docker
-        run: |
-          docker run --rm ${{ github.run_id }} echo "run test commands here"
+    #     # for simple tests (npm test, etc.) just run a local image in docker
+    #   - name: Unit Testing in Docker
+    #     run: |
+    #       docker run --rm ${{ github.run_id }} echo "run test commands here"
 
-        # integration tests
-      - name: Test healthcheck in Docker Compose
-        run: |
-          export TESTING_IMAGE="${{ github.run_id }}"
-          docker compose -f docker-compose.test.yml up --exit-code-from sut
+    #     # integration tests
+    #   - name: Test healthcheck in Docker Compose
+    #     run: |
+    #       export TESTING_IMAGE="${{ github.run_id }}"
+    #       docker compose -f docker-compose.test.yml up --exit-code-from sut
 
-      # run scans of the image at Docker engine without actions
-      - name: Run Trivy for all CVEs (non-blocking)
-        uses: aquasecurity/trivy-action@master
-        with:
-          image-ref: ${{ github.run_id }}
-          exit-code: 0
-          format: table 
+    #   # run scans of the image at Docker engine without actions
+    #   - name: Run Trivy for all CVEs (non-blocking)
+    #     uses: aquasecurity/trivy-action@master
+    #     with:
+    #       image-ref: ${{ github.run_id }}
+    #       exit-code: 0
+    #       format: table 
 
-      # run scans of the image at Docker engine and block if critical vulner. exists
-      - name: Run Trivy for HIGH,CRITICAL CVEs and report (blocking)
-        uses: aquasecurity/trivy-action@master
-        with:
-          image-ref: ${{ github.run_id }}
-          exit-code: 1
-          ignore-unfixed: true
-          vuln-type: 'os,library'
-          severity: 'HIGH,CRITICAL'
-          format: 'sarif'
-          output: 'trivy-results.sarif'
+    #   # run scans of the image at Docker engine and block if critical vulner. exists
+    #   - name: Run Trivy for HIGH,CRITICAL CVEs and report (blocking)
+    #     uses: aquasecurity/trivy-action@master
+    #     with:
+    #       image-ref: ${{ github.run_id }}
+    #       exit-code: 1
+    #       ignore-unfixed: true
+    #       vuln-type: 'os,library'
+    #       severity: 'HIGH,CRITICAL'
+    #       format: 'sarif'
+    #       output: 'trivy-results.sarif'
         
-      - name: Upload Trivy scan results to GitHub Security tab
-        uses: github/codeql-action/upload-sarif@v3
-        if: always()
-        with:
-          sarif_file: 'trivy-results.sarif'
+    #   - name: Upload Trivy scan results to GitHub Security tab
+    #     uses: github/codeql-action/upload-sarif@v3
+    #     if: always()
+    #     with:
+    #       sarif_file: 'trivy-results.sarif'
 
-      - name: Docker Metadata for Final Image Build
-        id: docker_meta_jk
-        uses: docker/metadata-action@v5
-        with:
-          images: justinask01/docker2 # List of Docker images to use as base name for tags. Value taken from Docker repository
-          flavor: |
-            latest=false
-          tags: |
-            type=raw,value=07
+    #   - name: Docker Metadata for Final Image Build
+    #     id: docker_meta_jk
+    #     uses: docker/metadata-action@v5
+    #     with:
+    #       images: justinask01/docker2 # List of Docker images to use as base name for tags. Value taken from Docker repository
+    #       flavor: |
+    #         latest=false
+    #       tags: |
+    #         type=raw,value=07
 
-      - name: Docker Build and Push to Docker Hub
-        uses: docker/build-push-action@v6
-        with:
-          push: true
-          tags: ${{ steps.docker_meta_jk.outputs.tags}}
-          labels: ${{ steps.docker_meta_jk.outputs.labels}}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          pla tforms: linux/amd64,linux/arm64
+    #   - name: Docker Build and Push to Docker Hub
+    #     uses: docker/build-push-action@v6
+    #     with:
+    #       push: true
+    #       tags: ${{ steps.docker_meta_jk.outputs.tags}}
+    #       labels: ${{ steps.docker_meta_jk.outputs.labels}}
+    #       cache-from: type=gha
+    #       cache-to: type=gha,mode=max
+    #       pla tforms: linux/amd64,linux/arm64
