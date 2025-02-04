@@ -15,7 +15,7 @@ jobs:
     permissions:
       contents: read # for actions/checkout to fetch code
       security-events: write # for github/codeql-action/upload-sarif to upload SARIF results
-      packages: write # needed to push docker image to ghcr.io
+      packages: write # needed to push docker image to ghcr.io, used for GITHUB_TOKEN
     
     steps:
 
@@ -58,7 +58,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           push: true
-          tags: ghcr.io/justinasjk/docker2:${{ github.run_id }} # github repository path
+          tags: ghcr.io/docker2/jonas:${{ github.run_id }} # github repository path
           target: test
           cache-from: type=gha
           cache-to: type=gha,mode=max
