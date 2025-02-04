@@ -58,7 +58,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           push: true
-          tags: ghcr.io/docker2/jonas:${{ github.run_id }} # github repository path
+          tags: ghcr.io/justinasjk/docker2:${{ github.run_id }} # github repository path
           target: test
           cache-from: type=gha
           cache-to: type=gha,mode=max
