@@ -153,8 +153,8 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Pull image to scan
-        run: docker pull ghcr.io/justinasjk/docker2:"$GITHUB_RUN_ID"
+      # - name: Pull image to scan
+      #   run: docker pull ghcr.io/justinasjk/docker2:"$GITHUB_RUN_ID"
         
       - name: Run Trivy for all CVEs (non-blocking)
         uses: aquasecurity/trivy-action@master
@@ -162,109 +162,46 @@ jobs:
           image-ref: ghcr.io/justinasjk/docker2:${{ github.run_id }}
           format: table
           exit-code: 0
-    
 
+# NEXT JOB - BUILD FINAL IMAGE #######################################################################
+  build-final-image:
+    name: Build Final Image
+    needs: [test-unit, test-integration, test-k3d, scan-image]  
+    runs-on: ubuntu-latest
 
+    permissions:
+      packages: write # needed to push docker image to ghcr.io, used for GITHUB_TOKEN variable
 
+    steps:
 
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
 
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-
-
-
-
-
-
-    #   - uses: AbsaOSS/k3d-action@v2
-    #     with:
-    #       cluster-name: "test-cluster-1"
-    #       args: >-
-    #         --agents 1
-    #         --no-lb
-    #         --k3s-arg "--no-deploy=traefik,servicelb,metrics-server@server:*"
-
-    #  # testing temporary image in k3d Kubernetes at github registry   
-    #   - name: Smoke test deployment in k3d Kubernetes
-    #     run: |
-    #       kubectl create secret docker-registry regcred \
-    #         --docker-server=https://ghcr.io \
-    #         --docker-username=${{ github.actor }} \
-    #         --docker-password=${{ secrets.GITHUB_TOKEN }}
-    #       export TESTING_IMAGE=ghcr.io/justinasjk/docker2:"$GITHUB_RUN_ID"
-    #       envsubst < manifests/deployment.yaml  | kubectl apply -f -
-    #       kubectl rollout status deployment myapp
-    #       kubectl exec deploy/myapp -- curl --fail localhost
-
-    # # testing of K8s has finished
-
-    #   - name: Build and export to Docker
-    #     uses: docker/build-push-action@v6
-    #     with:
-    #       push: false
-    #       load: true # Export to Docker Engine rather than pushing to a registry
-    #       tags: ${{ github.run_id }}
-    #       target: test # build only "test" stage, value takne from Dockerfile
-    #       cache-from: type=gha # Uses GitHub Actions cache to speed up future builds
-    #       cache-to: type=gha,mode=max #Stores cache layers to avoid rebuilding unchanged parts
-    #       platforms: linux/amd64
-
-    #   - name: List docker images
-    #     run: docker image ls
-
-    #     # for simple tests (npm test, etc.) just run a local image in docker
-    #   - name: Unit Testing in Docker
-    #     run: |
-    #       docker run --rm ${{ github.run_id }} echo "run test commands here"
-
-    #     # integration tests
-    #   - name: Test healthcheck in Docker Compose
-    #     run: |
-    #       export TESTING_IMAGE="${{ github.run_id }}"
-    #       docker compose -f docker-compose.test.yml up --exit-code-from sut
-
-    #   # run scans of the image at Docker engine without actions
-    #   - name: Run Trivy for all CVEs (non-blocking)
-    #     uses: aquasecurity/trivy-action@master
-    #     with:
-    #       image-ref: ${{ github.run_id }}
-    #       exit-code: 0
-    #       format: table 
-
-    #   # run scans of the image at Docker engine and block if critical vulner. exists
-    #   - name: Run Trivy for HIGH,CRITICAL CVEs and report (blocking)
-    #     uses: aquasecurity/trivy-action@master
-    #     with:
-    #       image-ref: ${{ github.run_id }}
-    #       exit-code: 1
-    #       ignore-unfixed: true
-    #       vuln-type: 'os,library'
-    #       severity: 'HIGH,CRITICAL'
-    #       format: 'sarif'
-    #       output: 'trivy-results.sarif'
-        
-    #   - name: Upload Trivy scan results to GitHub Security tab
-    #     uses: github/codeql-action/upload-sarif@v3
-    #     if: always()
-    #     with:
-    #       sarif_file: 'trivy-results.sarif'
-
-    #   - name: Docker Metadata for Final Image Build
-    #     id: docker_meta_jk
-    #     uses: docker/metadata-action@v5
-    #     with:
-    #       images: justinask01/docker2 # List of Docker images to use as base name for tags. Value taken from Docker repository
-    #       flavor: |
-    #         latest=false
-    #       tags: |
-    #         type=raw,value=07
-
-    #   - name: Docker Build and Push to Docker Hub
-    #     uses: docker/build-push-action@v6
-    #     with:
-    #       push: true
-    #       tags: ${{ steps.docker_meta_jk.outputs.tags}}
-    #       labels: ${{ steps.docker_meta_jk.outputs.labels}}
-    #       cache-from: type=gha
-    #       cache-to: type=gha,mode=max
-    #       pla tforms: linux/amd64,linux/arm64
+      - name: Docker Metadata for Final Image Build
+        id: docker_meta
+        uses: docker/metadata-action@v5
+        with:
+          images: justinask01/docker2
+          flavor: |
+            latest=false
+          tags: |
+            type=raw,value=99
+      
+      - name: Docker Build and Push to GHCR and Docker Hub
+        uses: docker/build-push-action@v6
+        with:
+          push: true
+          tags: ${{ steps.docker_meta.outputs.tags }}
+          labels: ${{ steps.docker_meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64,linux/arm64
