@@ -153,8 +153,8 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Pull image to scan
-        run: docker pull ghcr.io/justinasjk/docker2:"$GITHUB_RUN_ID"
+      # - name: Pull image to scan
+      #   run: docker pull ghcr.io/justinasjk/docker2:"$GITHUB_RUN_ID"
         
       - name: Run Trivy for all CVEs (non-blocking)
         uses: aquasecurity/trivy-action@master
